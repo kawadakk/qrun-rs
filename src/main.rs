@@ -284,41 +284,24 @@ fn main() -> Result<()> {
         .with_context(|| format!("Could not map the segment at address {:#x}", phdr.p_vaddr))?;
     }
 
-    // Bootloader
-    #[rustfmt::skip]
-    let bootloader = [
-        // exit:
-        //   b exit
-        0x14000000u32,
-        // start:
-        //   blr x0
-        0xd63f0000,
-        //   b exit
-        0x17fffffe,
-    ];
-    let bootloader_va = 0x100000000;
-    let bootloader_start_va = bootloader_va + 4;
-    let bootloader_exit_va = bootloader_va;
+    // Exit point (it doesn't require executable code, but the memory needs to
+    // be executable)
+    let exit_va = 0xe0000000;
     emu.mem_map(
-        bootloader_va,
+        exit_va,
         1 << PAGE_SHIFT,
         unicorn::Protection::READ | unicorn::Protection::EXEC,
     )
     .unwrap();
 
-    for (i, word) in bootloader.iter().enumerate() {
-        emu.mem_write(bootloader_va + (i as u64) * 4, &word.to_le_bytes())
-            .unwrap();
-    }
-
-    // Bootloader parameters
-    emu.reg_write(unicorn::RegisterARM64::X0, entry_va).unwrap();
+    // Initial register values
+    emu.reg_write(unicorn::RegisterARM64::LR, exit_va).unwrap();
     if let Some(va) = stack_start_va {
         emu.reg_write(unicorn::RegisterARM64::SP, va).unwrap();
     }
 
     let max_instr_count = 0x10000000;
-    let result = emu.emu_start(bootloader_start_va, bootloader_exit_va, 0, max_instr_count);
+    let result = emu.emu_start(entry_va, exit_va, 0, max_instr_count);
 
     // Dump the register
     let int_regs = &[
