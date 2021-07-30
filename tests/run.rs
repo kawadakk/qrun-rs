@@ -32,8 +32,6 @@ fn run_and_get_output(code: &str, args: &[String]) -> String {
 #[test]
 fn run() {
     let code = r#"
-	.global main
-	main:
 		mov x0, #1
 		mov x1, #2
 		add x2, x0, x1

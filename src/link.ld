@@ -7,6 +7,7 @@ SECTIONS
 
   .text :
   {
+    KEEP(*(.text));
     *(.text .text.*);
     . = ALIGN(4);
   }

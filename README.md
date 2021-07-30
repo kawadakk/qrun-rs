@@ -4,12 +4,9 @@ Take AArch64 instructions, execute them, and display the final CPU state right a
 
 ```
 $ qrun
-.global main
-main:
-    mov x0, #1
-    mov x1, #2
-    add x2, x0, x1
-	ret
+mov x0, #1
+mov x1, #2
+add x2, x0, x1
 ^D
 x0  = 0x00000000000001 x1  = 0x00000000000002 x2  = 0x00000000000003 x3  = 0x00000000000000
 x4  = 0x00000000000000 x5  = 0x00000000000000 x6  = 0x00000000000000 x7  = 0x00000000000000

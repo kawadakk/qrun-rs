@@ -5,7 +5,11 @@
 
 #[rustfmt::skip]
 global_asm!(r###"
+.text
+.global default_main
+default_main:
 {code}
+ret
 "###);
 
 #[panic_handler]

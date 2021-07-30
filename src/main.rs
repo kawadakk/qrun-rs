@@ -123,6 +123,7 @@ fn main() -> Result<()> {
     let elf = goblin::elf::Elf::parse(&mmap).context("Could not parse the compiled file")?;
 
     // Find the entry point, etc.
+    let mut weak_entry_va = None;
     let mut entry_va = None;
     let mut stack_start_va = None;
     let mut ram_start_va = None;
@@ -141,6 +142,10 @@ fn main() -> Result<()> {
                 log::debug!("Found `main` at {:#x}", sym.st_value);
                 entry_va = Some(sym.st_value);
             }
+            "default_main" => {
+                log::debug!("Found `default_main` at {:#x}", sym.st_value);
+                weak_entry_va = Some(sym.st_value);
+            }
             "_stack_start" => {
                 log::debug!("Found `_stack_start` at {:#x}", sym.st_value);
                 stack_start_va = Some(sym.st_value);
@@ -157,8 +162,9 @@ fn main() -> Result<()> {
         }
     }
 
-    let entry_va =
-        entry_va.context("Could not find an entry point. Please define a symbol named `main`")?;
+    let entry_va = entry_va
+        .or(weak_entry_va)
+        .context("Could not find an entry point. Please define a symbol named `main`")?;
     let ram_start_va = ram_start_va.context("Could not find `_ram_start`")?;
     let ram_end_va = ram_end_va.context("Could not find `_ram_end`")?;
 
