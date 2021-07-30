@@ -1,0 +1,15 @@
+[package]
+name = "qrun"
+version = "0.0.0"
+edition = "2018"
+publish = false
+
+[dependencies]
+anyhow = "1.0.42"
+clap = "3.0.0-beta.2"
+unicorn = "0.9"
+tempfile = "3.2.0"
+goblin = "0.4.2"
+memmap2 = "0.3.0"
+log = "0.4"
+env_logger = "0.8"
