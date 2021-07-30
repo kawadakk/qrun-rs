@@ -2,7 +2,7 @@
 use anyhow::{Context, Result};
 use clap::{ArgEnum, Clap};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     convert::TryFrom,
     env,
     io::prelude::*,
@@ -26,10 +26,18 @@ struct Opts {
     /// variable.
     #[clap(short, long, parse(from_occurrences))]
     verbose: usize,
+
     #[clap(long, short, default_value = "aarch64-unknown-none")]
     target: String,
+
     #[clap(short = 'x', arg_enum, default_value = "rust-asm")]
     lang: Lang,
+
+    /// Show the compiled instruction encoding
+    #[clap(long)]
+    print_encoding: bool,
+
+    /// The source file
     source: PathBuf,
 }
 
@@ -128,13 +136,12 @@ fn main() -> Result<()> {
     let mut stack_start_va = None;
     let mut ram_start_va = None;
     let mut ram_end_va = None;
-    for sym in elf.syms.iter() {
-        let name = if let Some(x) = elf.strtab.get_at(sym.st_name) {
-            x
-        } else {
-            continue;
-        };
-
+    let iter_syms = || {
+        elf.syms
+            .iter()
+            .filter_map(|sym| elf.strtab.get_at(sym.st_name).map(|name| (name, sym)))
+    };
+    for (name, sym) in iter_syms() {
         log::trace!("Found symbol {:?} at {:#x}", name, sym.st_value);
 
         match name {
@@ -180,13 +187,13 @@ fn main() -> Result<()> {
         let start = phdr.p_vaddr >> PAGE_SHIFT;
         let end = (phdr.p_vaddr + phdr.p_memsz - 1) >> PAGE_SHIFT;
         let mut prot = unicorn::Protection::empty();
-        if phdr.p_flags & (goblin::elf::program_header::PF_R) != 0 {
+        if phdr.p_flags & goblin::elf::program_header::PF_R != 0 {
             prot |= unicorn::Protection::READ;
         }
-        if phdr.p_flags & (goblin::elf::program_header::PF_W) != 0 {
+        if phdr.p_flags & goblin::elf::program_header::PF_W != 0 {
             prot |= unicorn::Protection::WRITE;
         }
-        if phdr.p_flags & (goblin::elf::program_header::PF_X) != 0 {
+        if phdr.p_flags & goblin::elf::program_header::PF_X != 0 {
             prot |= unicorn::Protection::EXEC;
         }
 
@@ -249,6 +256,7 @@ fn main() -> Result<()> {
     }
 
     // Load the compiled program
+    let mut printed = Vec::new();
     for phdr in elf.program_headers.iter() {
         log::debug!("Processing segment {:?} for mapping", phdr);
         if phdr.p_filesz == 0 {
@@ -281,13 +289,62 @@ fn main() -> Result<()> {
                 phdr.p_vaddr + (file_len as u64 - 1),
             );
 
-            emu.mem_write(phdr.p_vaddr, &mmap[file_start..file_end])
+            let bytes = &mmap[file_start..file_end];
+
+            emu.mem_write(phdr.p_vaddr, bytes)
                 .map_err(fix_unicorn_err)
                 .with_context(|| format!("Could not load the segment from the compiled file"))?;
+
+            if (phdr.p_flags & goblin::elf::program_header::PF_X) != 0 {
+                printed.push((phdr, bytes));
+            }
 
             Ok(()) as Result<()>
         })()
         .with_context(|| format!("Could not map the segment at address {:#x}", phdr.p_vaddr))?;
+    }
+
+    if opts.print_encoding {
+        let sym_map: HashMap<_, _> = iter_syms()
+            .map(|(name, sym)| (sym.st_value, name))
+            .collect();
+
+        println!("----- Instruction Encoding -----");
+        for (phdr, bytes) in printed.iter() {
+            let mut iter_instrs = (phdr.p_vaddr..).step_by(4).zip(bytes.chunks(4)).peekable();
+            while let Some((va, instr)) = iter_instrs.next() {
+                // Deduplicate repeated instructions
+                let mut count = 1;
+                while let Some(&(_, instr2)) = iter_instrs.peek() {
+                    if instr2 != instr {
+                        break;
+                    }
+                    count += 1;
+                    iter_instrs.next();
+                }
+
+                // Symbolicate the location
+                if let Some(name) = sym_map.get(&va) {
+                    println!("{}:", name);
+                }
+
+                // Print the instruction
+                let instr = u32::from_le_bytes([instr[0], instr[1], instr[2], instr[3]]);
+                print!("  {:016x}: {:08x} ", va, instr);
+                match bad64::decode(instr, va) {
+                    Ok(decoded) => {
+                        println!("{}", decoded);
+                    }
+                    Err(e) => {
+                        println!("< {:?} >", e);
+                    }
+                }
+
+                if count > 1 {
+                    println!("  [  repeated for {} times  ]", count);
+                }
+            }
+        }
     }
 
     // Exit point (it doesn't require executable code, but the memory needs to
@@ -345,8 +402,8 @@ fn main() -> Result<()> {
         ("sp", unicorn::RegisterARM64::SP),
         ("pc", unicorn::RegisterARM64::PC),
     ];
-
     let cols = 4;
+    println!("----- Final CPU State -----");
     for int_regs in int_regs.chunks(cols) {
         for (name, reg) in int_regs.iter() {
             let value = emu.reg_read(*reg).unwrap();

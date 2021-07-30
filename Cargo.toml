@@ -6,6 +6,7 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.42"
+bad64 = "0.3.0"
 clap = "3.0.0-beta.2"
 unicorn = "0.9"
 tempfile = "3.2.0"
@@ -13,3 +14,9 @@ goblin = "0.4.2"
 memmap2 = "0.3.0"
 log = "0.4"
 env_logger = "0.8"
+
+[patch.crates-io]
+# Avoid native library collision (rust-lang/cargo#5237) by switching to the fork
+# of `bad64-sys` that does not run `bindgen` in its build script
+bad64 = { git = "https://github.com/kawadakk/bad64.git", branch = "portable-casting" }
+bad64-sys = { git = "https://github.com/kawadakk/bad64-sys.git", branch = "prebindgen-0.3-built" }
