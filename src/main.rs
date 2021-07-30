@@ -149,8 +149,8 @@ fn main() -> Result<()> {
                 log::debug!("Found `main` at {:#x}", sym.st_value);
                 entry_va = Some(sym.st_value);
             }
-            "default_main" => {
-                log::debug!("Found `default_main` at {:#x}", sym.st_value);
+            "implicit_main" => {
+                log::debug!("Found `implicit_main` at {:#x}", sym.st_value);
                 weak_entry_va = Some(sym.st_value);
             }
             "_stack_start" => {
