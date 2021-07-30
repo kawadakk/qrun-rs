@@ -407,7 +407,7 @@ fn main() -> Result<()> {
     for int_regs in int_regs.chunks(cols) {
         for (name, reg) in int_regs.iter() {
             let value = emu.reg_read(*reg).unwrap();
-            print!("{:3} = {:#016x} ", name, value);
+            print!("{:3} = {:#018x} ", name, value);
         }
         println!();
     }
