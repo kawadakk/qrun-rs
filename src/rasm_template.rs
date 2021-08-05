@@ -1,7 +1,14 @@
-#![feature(global_asm)]
-#![feature(lang_items)]
-#![no_std]
+#![feature(rustc_attrs)]
+#![feature(no_core)]
+#![no_core]
 #![no_main]
+
+#[rustc_builtin_macro]
+macro_rules! global_asm {
+    () => {
+        /* compiler built-in */
+    };
+}
 
 #[rustfmt::skip]
 global_asm!(r###"
@@ -11,11 +18,3 @@ implicit_main:
 {code}
 ret
 "###);
-
-#[panic_handler]
-fn panic_handler(_: &core::panic::PanicInfo) -> ! {
-    loop {}
-}
-
-#[lang = "eh_personality"]
-extern "C" fn rust_eh_personality() {}
