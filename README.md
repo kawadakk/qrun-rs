@@ -27,3 +27,9 @@ x24 = 0x00000000000000 x25 = 0x00000000000000 x26 = 0x00000000000000 x27 = 0x000
 x28 = 0x00000000000000 x29 = 0x00000000000000 lr  = 0x000000e0000000 sp  = 0x00000010011000
 pc  = 0x000000e0000000
 ```
+
+## Prerequisite
+
+- rustup (at compile time and runtime)
+- (On Windows) Visual C++ 2017 Windows XP toolchain
+
