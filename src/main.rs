@@ -30,6 +30,10 @@ struct Opts {
     #[clap(long, short, default_value = "aarch64-unknown-none")]
     target: String,
 
+    /// Specifies the toolchain to use when invoking the rustup-provided `rustc`.
+    #[clap(long)]
+    rustup_toolchain: Option<String>,
+
     #[clap(short = 'x', arg_enum, default_value = "rust-asm")]
     lang: Lang,
 
@@ -52,8 +56,38 @@ fn main() -> Result<()> {
     )
     .init();
 
-    let rustc = env::var_os("RUSTC");
-    let rustc = rustc.unwrap_or("rustc".into());
+    let env_rustc = env::var_os("RUSTC").filter(|p| !p.is_empty());
+    let is_probably_rustup_rustc = env_rustc.is_none();
+    if is_probably_rustup_rustc {
+        log::debug!(
+            "$RUSTC is unspecified, so we will use `rustc` and \
+            assume it's rustup-provided"
+        );
+    } else {
+        log::debug!(
+            "$RUSTC = {:?}. Since we don't know if it's rustup-provided, \
+            we will skip the automatic bootstrapping process",
+            env_rustc
+        );
+    }
+    let rustc = env_rustc.unwrap_or("rustc".into());
+
+    let rustup_toolchain_arg = opts
+        .rustup_toolchain
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .or(if is_probably_rustup_rustc {
+            // Use the same toolchain as the one used to compile this program
+            Some(include_str!("../rust-toolchain").trim())
+        } else {
+            None
+        })
+        .map(|toolchain| format!("+{}", toolchain));
+    if let Some(rustup_toolchain_arg) = &rustup_toolchain_arg {
+        log::debug!("We will pass {:?} to rustc", rustup_toolchain_arg);
+    } else {
+        log::debug!("We will not pass a toolchain parameter");
+    }
 
     let rust_src_file: Box<dyn CowFile + '_>;
 
@@ -93,6 +127,7 @@ fn main() -> Result<()> {
     let linker_script_path = temp_path_initialized(include_bytes!("link.ld"))?;
 
     std::process::Command::new(&rustc)
+        .args(rustup_toolchain_arg)
         .arg("-Copt-level=3")
         .arg("--crate-type=bin")
         .arg("--crate-name=qrun")
