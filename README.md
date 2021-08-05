@@ -3,6 +3,8 @@
 Take AArch64 instructions, execute them, and display the final CPU state right away
 
 ```
+$ cargo +nightly-2021-07-27 install --git https://github.com/kawadakk/qrun-rs.git
+
 $ qrun --print-encoding -
 mov x0, #1
 mov x1, #2
@@ -28,7 +30,7 @@ x28 = 0x00000000000000 x29 = 0x00000000000000 lr  = 0x000000e0000000 sp  = 0x000
 pc  = 0x000000e0000000
 ```
 
-## Prerequisite
+## Prerequisites
 
 - rustup (at compile time and runtime)
 - (On Windows) Visual C++ 2017 Windows XP toolchain
